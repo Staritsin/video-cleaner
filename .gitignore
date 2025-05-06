@@ -1,0 +1,6 @@
+*.json
+*.wav
+*.mp3
+.cache/
+__pycache__/
+output_cut.mp4
