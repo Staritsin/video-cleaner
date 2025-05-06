@@ -3,7 +3,14 @@ from fastapi.responses import FileResponse
 import os
 import subprocess
 
+from fastapi import FastAPI
+
 app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"status": "🚀 Server is up and running!"}
+
 
 UPLOAD_DIR = "/tmp/uploads"
 OUTPUT_PATH = "/tmp/output_cut.mp4"
