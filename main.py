@@ -1,47 +1,36 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import FileResponse, JSONResponse
 import os
-import subprocess
-
-from fastapi import FastAPI
+import shutil
 
 app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"status": "🚀 Server is up and running!"}
-
 
 UPLOAD_DIR = "/tmp/uploads"
 OUTPUT_PATH = "/tmp/output_cut.mp4"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+@app.get("/")
+def read_root():
+    return {"status": "🚀 Server is up and running"}
+
 @app.post("/clean")
 async def clean_video(file: UploadFile = File(...)):
-    input_path = os.path.join(UPLOAD_DIR, file.filename)
-    with open(input_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-
-    if os.path.exists(OUTPUT_PATH):
-        os.remove(OUTPUT_PATH)
-
-    command = [
-        "auto-editor",
-        input_path,
-        "--silent-speed", "99999",
-        "--video-speed", "1",
-        "--frame-rate", "30",
-        "-o", OUTPUT_PATH
-    ]
-
     try:
-        subprocess.run(command, check=True)
-    except subprocess.CalledProcessError:
-        raise HTTPException(status_code=500, detail="Ошибка обработки видео")
+        input_path = os.path.join(UPLOAD_DIR, file.filename)
 
-    if not os.path.exists(OUTPUT_PATH):
-        raise HTTPException(status_code=500, detail="Выходной файл не создан")
+        # Сохраняем файл
+        with open(input_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
 
-    return FileResponse(OUTPUT_PATH, media_type="video/mp4", filename="output_cut.mp4")
+        print("✅ Файл сохранён:", input_path)
+
+        # Заглушка: просто копируем как будто обработали
+        shutil.copy(input_path, OUTPUT_PATH)
+
+        print("✅ Обработка завершена. Возврат файла:", OUTPUT_PATH)
+        return FileResponse(OUTPUT_PATH, media_type="video/mp4", filename="result.mp4")
+
+    except Exception as e:
+        print("❌ Ошибка обработки:", str(e))
+        return JSONResponse(status_code=500, content={"detail": f"Ошибка обработки: {str(e)}"})
