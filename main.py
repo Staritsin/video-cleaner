@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
 import os
 import shutil
+import subprocess
 
 app = FastAPI()
 
@@ -19,18 +20,36 @@ async def clean_video(file: UploadFile = File(...)):
     try:
         input_path = os.path.join(UPLOAD_DIR, file.filename)
 
-        # Сохраняем файл
+        # Сохраняем загруженный файл
         with open(input_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
-        print("✅ Файл сохранён:", input_path)
+        print("✅ Файл получен:", input_path)
 
-        # Заглушка: просто копируем как будто обработали
-        shutil.copy(input_path, OUTPUT_PATH)
+        # Удаляем выходной файл, если был
+        if os.path.exists(OUTPUT_PATH):
+            os.remove(OUTPUT_PATH)
 
-        print("✅ Обработка завершена. Возврат файла:", OUTPUT_PATH)
-        return FileResponse(OUTPUT_PATH, media_type="video/mp4", filename="result.mp4")
+        # Запускаем auto-editor
+        result = subprocess.run(
+            ["auto-editor", input_path, "--output_file", OUTPUT_PATH],
+            capture_output=True,
+            text=True
+        )
+
+        print("STDOUT:", result.stdout)
+        print("STDERR:", result.stderr)
+
+        if result.returncode != 0:
+            raise Exception("Auto-editor failed")
+
+        # Проверка наличия файла
+        if not os.path.exists(OUTPUT_PATH):
+            raise Exception("Файл не создан")
+
+        print("✅ Обработка завершена")
+        return FileResponse(OUTPUT_PATH, media_type="video/mp4", filename="cleaned.mp4")
 
     except Exception as e:
-        print("❌ Ошибка обработки:", str(e))
-        return JSONResponse(status_code=500, content={"detail": f"Ошибка обработки: {str(e)}"})
+        print("❌ Ошибка:", str(e))
+        return JSONResponse(status_code=500, content={"detail": f"Ошибка: {str(e)}"})
